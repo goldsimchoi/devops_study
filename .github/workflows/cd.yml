@@ -40,10 +40,10 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
-      LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
+      REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME || vars.DOMAIN_NAME }}
+      LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL || vars.LETSENCRYPT_EMAIL }}
 
     steps:
       - uses: actions/checkout@v3
@@ -66,11 +66,16 @@ jobs:
             docker-compose.prod.yml nginx certbot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
 
+      - name: Validate TLS inputs
+        run: |
+          [ -n "${REMOTE_APP_DIR}" ] || { echo "REMOTE_APP_DIR is required (set secret or variable)."; exit 1; }
+          [ -n "${DOMAIN_NAME}" ] || { echo "DOMAIN_NAME is required (set secret or variable)."; exit 1; }
+          [ -n "${LETSENCRYPT_EMAIL}" ] || { echo "LETSENCRYPT_EMAIL is required (set secret or variable)."; exit 1; }
+
       - name: Issue TLS certificate (first deploy only)
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
-            [ -n '${DOMAIN_NAME}' ] && [ -n '${LETSENCRYPT_EMAIL}' ] || { echo 'DOMAIN_NAME and LETSENCRYPT_EMAIL secrets are required'; exit 1; }; \
             cd ${REMOTE_APP_DIR} && \
             export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
             mkdir -p certbot/conf certbot/www && \
