@@ -42,6 +42,8 @@ jobs:
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
 
     steps:
       - uses: actions/checkout@v3
@@ -61,8 +63,26 @@ jobs:
       - name: Copy files to VM (scp)
         run: |
           scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r \
-            docker-compose.prod.yml nginx \
+            docker-compose.prod.yml nginx certbot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
+
+      - name: Issue TLS certificate (first deploy only)
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
+            set -euo pipefail; \
+            [ -n '${DOMAIN_NAME}' ] && [ -n '${LETSENCRYPT_EMAIL}' ] || { echo 'DOMAIN_NAME and LETSENCRYPT_EMAIL secrets are required'; exit 1; }; \
+            cd ${REMOTE_APP_DIR} && \
+            export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
+            mkdir -p certbot/conf certbot/www && \
+            if [ ! -f certbot/conf/live/app/fullchain.pem ]; then \
+              docker compose -f docker-compose.prod.yml down || true; \
+              docker run --rm -p 80:80 \
+                -v ${REMOTE_APP_DIR}/certbot/conf:/etc/letsencrypt \
+                -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
+                certbot/certbot certonly --standalone --non-interactive --agree-tos \
+                --email ${LETSENCRYPT_EMAIL} --cert-name app \
+                -d ${DOMAIN_NAME} -d www.${DOMAIN_NAME}; \
+            fi"
 
       - name: Pull & restart on VM
         run: |
@@ -71,4 +91,9 @@ jobs:
             cd ${REMOTE_APP_DIR} && \
             export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
             docker compose -f docker-compose.prod.yml pull && \
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans"
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans && \
+            docker run --rm \
+              -v ${REMOTE_APP_DIR}/certbot/conf:/etc/letsencrypt \
+              -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
+              certbot/certbot renew --webroot -w /var/www/certbot --quiet || true; \
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true"
