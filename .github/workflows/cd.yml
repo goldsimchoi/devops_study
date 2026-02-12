@@ -61,7 +61,7 @@ jobs:
       - name: Copy files to VM (scp)
         run: |
           scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r \
-            docker-compose.yml docker-compose.prod.yml nginx \
+            docker-compose.prod.yml nginx \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
 
       - name: Pull & restart on VM
@@ -70,5 +70,5 @@ jobs:
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
             export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans"
+            docker compose -f docker-compose.prod.yml pull && \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans"

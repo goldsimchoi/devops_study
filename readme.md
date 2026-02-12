@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-기모찌.
-gdgdgdddg
-=======
+DEVOPS 스터디입니다
 
-
-왜 pr안돼!!!!
->>>>>>> 783bef1 (chore: rerun actions)
+필요한 것들을 만들어 보려 합니다.
