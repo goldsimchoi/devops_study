@@ -1,13 +1,15 @@
 services:
   web:
-    build: .
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
     ports:
       - "5000:5000"
     environment:
       - FLASK_ENV=development
     # (선택) 코드 변경 시 자동 반영하려면:
     # volumes:
-    #   - .:/app
+    #   - ./apps/backend:/app
 
   nginx:
     image: nginx:alpine

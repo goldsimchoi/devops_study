@@ -27,7 +27,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
-          context: .
+          context: ./apps/backend
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/myflask:latest
