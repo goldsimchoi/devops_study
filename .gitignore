@@ -6,3 +6,6 @@ certbot/conf/*
 !certbot/conf/.gitkeep
 certbot/www/*
 !certbot/www/.gitkeep
+apps/frontend/blog_bm0p/node_modules/
+apps/frontend/blog_bm0p/.astro/
+apps/frontend/blog_bm0p/dist/
