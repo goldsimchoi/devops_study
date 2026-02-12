@@ -42,7 +42,7 @@ jobs:
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
       REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
-      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME || vars.DOMAIN_NAME }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN || vars.DOMAIN }}
       LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL || vars.LETSENCRYPT_EMAIL }}
 
     steps:
