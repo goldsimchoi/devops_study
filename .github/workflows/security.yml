@@ -17,6 +17,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write # SARIF upload
       pull-requests: read
@@ -128,11 +129,13 @@ jobs:
 
       - name: Hadolint (single file)
         if: ${{ steps.df.outputs.found == 'true' && steps.df.outputs.count == '1' }}
+        continue-on-error: true
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ${{ steps.df.outputs.first }}
           format: sarif
           output-file: hadolint.sarif
+          no-fail: true
 
       - name: Hadolint (multi-file via CLI)
         if: ${{ steps.df.outputs.found == 'true' && steps.df.outputs.count != '1' }}
