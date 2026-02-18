@@ -1,16 +1,33 @@
 services:
-  web:
+  backend:
     image: ${DOCKERHUB_USERNAME}/myflask:latest
     environment:
       - FLASK_ENV=production
+      - POSTS_DIR=/posts
     expose:
       - "5000"
+    volumes:
+      - ./apps/frontend/blog_bm0p/src/content/posts:/posts
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apps/frontend/blog_bm0p
+      dockerfile: Dockerfile
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4321
+    expose:
+      - "4321"
+    volumes:
+      - ./apps/frontend/blog_bm0p/src/content/posts:/app/src/content/posts
     restart: unless-stopped
 
   nginx:
     image: nginx:alpine
     depends_on:
-      - web
+      - backend
+      - frontend
     ports:
       - "80:80"
       - "443:443"
