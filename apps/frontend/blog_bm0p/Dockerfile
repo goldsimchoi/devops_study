@@ -9,6 +9,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 4321
 
 CMD ["pnpm", "dev", "--host", "0.0.0.0", "--port", "4321"]

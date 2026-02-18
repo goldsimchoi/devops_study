@@ -4,6 +4,9 @@ services:
     environment:
       - FLASK_ENV=production
       - POSTS_DIR=/posts
+      - SECRET_KEY=${SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     expose:
       - "5000"
     volumes:
@@ -11,9 +14,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ./apps/frontend/blog_bm0p
-      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME}/myfrontend:latest
     environment:
       - HOST=0.0.0.0
       - PORT=4321
