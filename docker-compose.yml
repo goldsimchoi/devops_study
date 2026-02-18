@@ -1,22 +1,40 @@
 services:
-  web:
+  backend:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
     environment:
       - FLASK_ENV=development
+      - POSTS_DIR=/posts
+      - SECRET_KEY=dev-secret-change-me
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=change-me
+    expose:
+      - "5000"
+    volumes:
+      - ./apps/frontend/blog_bm0p/src/content/posts:/posts
     # (선택) 코드 변경 시 자동 반영하려면:
     # volumes:
     #   - ./apps/backend:/app
+  frontend:
+    build:
+      context: ./apps/frontend/blog_bm0p
+      dockerfile: Dockerfile
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4321
+    expose:
+      - "4321"
+    volumes:
+      - ./apps/frontend/blog_bm0p/src/content/posts:/app/src/content/posts
 
   nginx:
     image: nginx:alpine
     ports:
       - "8080:80"
     depends_on:
-      - web
+      - backend
+      - frontend
   # 호스트의 설정 파일을 컨테이너에 읽기 전용으로 연결
     volumes:
-      - ./nginx/conf:/etc/nginx/conf.d:ro
+      - ./nginx/conf/default.dev.conf:/etc/nginx/conf.d/default.conf:ro

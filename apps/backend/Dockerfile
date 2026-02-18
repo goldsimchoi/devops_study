@@ -12,6 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 앱 소스 복사
 COPY . .
 
+RUN useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
 # Flask가 바인딩할 포트
 EXPOSE 5000
 
