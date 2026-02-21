@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
-      REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
+      REMOTE_APP_DIR: /app
       DOMAIN_NAME: ${{ secrets.DOMAIN || vars.DOMAIN }}
       LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL || vars.LETSENCRYPT_EMAIL }}
       SECRET_KEY: ${{ secrets.SECRET_KEY || vars.SECRET_KEY }}
@@ -106,13 +106,24 @@ jobs:
       - name: Ensure remote dir exists
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
-            mkdir -p ${REMOTE_APP_DIR}"
+            mkdir -p ${REMOTE_APP_DIR} && \
+            mkdir -p ${REMOTE_APP_DIR}/apps/frontend/blog_bm0p/src/content/posts && \
+            mkdir -p ${REMOTE_APP_DIR}/certbot/conf ${REMOTE_APP_DIR}/certbot/www"
 
       - name: Copy files to VM (scp)
         run: |
           scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r \
             docker-compose.prod.yml nginx certbot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
+
+      - name: Verify expected compose services on VM
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
+            set -euo pipefail; \
+            cd ${REMOTE_APP_DIR} && \
+            docker compose -f docker-compose.prod.yml config --services | grep -Fx backend && \
+            docker compose -f docker-compose.prod.yml config --services | grep -Fx frontend && \
+            docker compose -f docker-compose.prod.yml config --services | grep -Fx nginx"
 
       - name: Validate TLS inputs
         run: |
@@ -159,3 +170,12 @@ jobs:
               -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
               certbot/certbot renew --webroot -w /var/www/certbot --quiet || true; \
             docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true"
+
+      - name: Post-deploy smoke check
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
+            set -euo pipefail; \
+            cd ${REMOTE_APP_DIR} && \
+            docker compose -f docker-compose.prod.yml ps && \
+            docker compose -f docker-compose.prod.yml exec -T backend \
+              python -c \"import urllib.request as u; r=u.urlopen('http://127.0.0.1:5000/api/health'); print(r.status); assert r.status == 200\""
