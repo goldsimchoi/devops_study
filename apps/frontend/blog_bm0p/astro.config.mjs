@@ -154,6 +154,10 @@ export default defineConfig({
 		],
 	},
 	vite: {
+		server: {
+			host: "0.0.0.0",
+			allowedHosts: ["bm0p.kr", "www.bm0p.kr"],
+		},
 		build: {
 			rollupOptions: {
 				onwarn(warning, warn) {
