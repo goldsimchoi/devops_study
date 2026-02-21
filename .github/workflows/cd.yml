@@ -116,6 +116,25 @@ jobs:
             docker-compose.prod.yml nginx certbot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
 
+      - name: Upload runtime env file to VM
+        run: |
+          set -euo pipefail
+          [ -n "${DOCKERHUB_USERNAME}" ] || { echo "DOCKERHUB_USERNAME is required."; exit 1; }
+          [ -n "${SECRET_KEY}" ] || { echo "SECRET_KEY is required."; exit 1; }
+          [ -n "${ADMIN_USERNAME}" ] || { echo "ADMIN_USERNAME is required."; exit 1; }
+          [ -n "${ADMIN_PASSWORD}" ] || { echo "ADMIN_PASSWORD is required."; exit 1; }
+          tmp_env="$(mktemp)"
+          chmod 600 "$tmp_env"
+          {
+            printf 'DOCKERHUB_USERNAME=%s\n' "${DOCKERHUB_USERNAME}"
+            printf 'SECRET_KEY=%s\n' "${SECRET_KEY}"
+            printf 'ADMIN_USERNAME=%s\n' "${ADMIN_USERNAME}"
+            printf 'ADMIN_PASSWORD=%s\n' "${ADMIN_PASSWORD}"
+          } > "$tmp_env"
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "$tmp_env" \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/.env
+          rm -f "$tmp_env"
+
       - name: Show remote deploy context
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
@@ -123,42 +142,50 @@ jobs:
             cd ${REMOTE_APP_DIR} && \
             pwd && \
             ls -la && \
-            sed -n '1,120p' docker-compose.prod.yml"
+            sed -n '1,120p' docker-compose.prod.yml && \
+            test -s .env"
 
       - name: Verify expected compose services on VM
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
-            export SECRET_KEY='${SECRET_KEY}' && \
-            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
-            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
-            docker compose -f docker-compose.prod.yml config --services | grep -Fx backend && \
-            docker compose -f docker-compose.prod.yml config --services | grep -Fx frontend && \
-            docker compose -f docker-compose.prod.yml config --services | grep -Fx nginx"
+            docker compose --env-file .env -f docker-compose.prod.yml config --services | grep -Fx backend && \
+            docker compose --env-file .env -f docker-compose.prod.yml config --services | grep -Fx frontend && \
+            docker compose --env-file .env -f docker-compose.prod.yml config --services | grep -Fx nginx"
 
       - name: Validate TLS inputs
         run: |
           [ -n "${REMOTE_APP_DIR}" ] || { echo "REMOTE_APP_DIR is required (set secret or variable)."; exit 1; }
+          [ -n "${DOCKERHUB_USERNAME}" ] || { echo "DOCKERHUB_USERNAME is required (set secret or variable)."; exit 1; }
           [ -n "${DOMAIN_NAME}" ] || { echo "DOMAIN_NAME is required (set secret or variable)."; exit 1; }
           [ -n "${LETSENCRYPT_EMAIL}" ] || { echo "LETSENCRYPT_EMAIL is required (set secret or variable)."; exit 1; }
           [ -n "${SECRET_KEY}" ] || { echo "SECRET_KEY is required (set secret or variable)."; exit 1; }
           [ -n "${ADMIN_USERNAME}" ] || { echo "ADMIN_USERNAME is required (set secret or variable)."; exit 1; }
           [ -n "${ADMIN_PASSWORD}" ] || { echo "ADMIN_PASSWORD is required (set secret or variable)."; exit 1; }
 
+      - name: Reclaim Docker disk on low space
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
+            set -euo pipefail; \
+            avail_kb=\$(df --output=avail / | tail -1 | tr -d ' '); \
+            echo \"Available disk before deploy: \${avail_kb}KB\"; \
+            if [ \"\${avail_kb}\" -lt 2097152 ]; then \
+              echo \"Low disk space detected. Pruning Docker artifacts...\"; \
+              docker container prune -f || true; \
+              docker image prune -af || true; \
+              docker builder prune -af || true; \
+              docker system df || true; \
+            fi"
+
       - name: Issue TLS certificate (first deploy only)
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
-            export SECRET_KEY='${SECRET_KEY}' && \
-            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
-            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
             mkdir -p certbot/conf certbot/www && \
             if [ ! -f certbot/conf/live/app/fullchain.pem ]; then \
-              docker compose -f docker-compose.prod.yml down || true; \
+              docker compose --env-file .env -f docker-compose.prod.yml down || true; \
               docker run --rm -p 80:80 \
                 -v ${REMOTE_APP_DIR}/certbot/conf:/etc/letsencrypt \
                 -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
@@ -172,27 +199,19 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
-            export SECRET_KEY='${SECRET_KEY}' && \
-            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
-            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
-            docker compose -f docker-compose.prod.yml pull; \
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans; \
+            docker compose --env-file .env -f docker-compose.prod.yml pull; \
+            docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans; \
             docker run --rm \
               -v ${REMOTE_APP_DIR}/certbot/conf:/etc/letsencrypt \
               -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
               certbot/certbot renew --webroot -w /var/www/certbot --quiet || true; \
-            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true"
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T nginx nginx -s reload || true"
 
       - name: Post-deploy smoke check
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
-            export SECRET_KEY='${SECRET_KEY}' && \
-            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
-            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
-            docker compose -f docker-compose.prod.yml ps && \
-            docker compose -f docker-compose.prod.yml exec -T backend \
+            docker compose --env-file .env -f docker-compose.prod.yml ps && \
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T backend \
               python -c \"import urllib.request as u; r=u.urlopen('http://127.0.0.1:5000/api/health'); print(r.status); assert r.status == 200\""
