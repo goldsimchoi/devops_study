@@ -116,11 +116,24 @@ jobs:
             docker-compose.prod.yml nginx certbot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_APP_DIR}/
 
+      - name: Show remote deploy context
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
+            set -euo pipefail; \
+            cd ${REMOTE_APP_DIR} && \
+            pwd && \
+            ls -la && \
+            sed -n '1,120p' docker-compose.prod.yml"
+
       - name: Verify expected compose services on VM
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
+            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
+            export SECRET_KEY='${SECRET_KEY}' && \
+            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
+            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
             docker compose -f docker-compose.prod.yml config --services | grep -Fx backend && \
             docker compose -f docker-compose.prod.yml config --services | grep -Fx frontend && \
             docker compose -f docker-compose.prod.yml config --services | grep -Fx nginx"
@@ -139,7 +152,7 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
+            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
             export SECRET_KEY='${SECRET_KEY}' && \
             export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
             export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
@@ -159,12 +172,12 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
-            export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
+            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
             export SECRET_KEY='${SECRET_KEY}' && \
             export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
             export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
-            docker compose -f docker-compose.prod.yml pull && \
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans && \
+            docker compose -f docker-compose.prod.yml pull; \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans; \
             docker run --rm \
               -v ${REMOTE_APP_DIR}/certbot/conf:/etc/letsencrypt \
               -v ${REMOTE_APP_DIR}/certbot/www:/var/www/certbot \
@@ -176,6 +189,10 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "\
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
+            export DOCKERHUB_USERNAME='${DOCKERHUB_USERNAME}' && \
+            export SECRET_KEY='${SECRET_KEY}' && \
+            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
+            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
             docker compose -f docker-compose.prod.yml ps && \
             docker compose -f docker-compose.prod.yml exec -T backend \
               python -c \"import urllib.request as u; r=u.urlopen('http://127.0.0.1:5000/api/health'); print(r.status); assert r.status == 200\""
