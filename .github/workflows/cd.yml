@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
-      REMOTE_APP_DIR: /app
+      REMOTE_APP_DIR: "~/app"
       DOMAIN_NAME: ${{ secrets.DOMAIN || vars.DOMAIN }}
       LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL || vars.LETSENCRYPT_EMAIL }}
       SECRET_KEY: ${{ secrets.SECRET_KEY || vars.SECRET_KEY }}
