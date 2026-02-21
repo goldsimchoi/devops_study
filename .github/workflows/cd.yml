@@ -89,6 +89,9 @@ jobs:
       REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
       DOMAIN_NAME: ${{ secrets.DOMAIN || vars.DOMAIN }}
       LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL || vars.LETSENCRYPT_EMAIL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY || vars.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || vars.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || vars.ADMIN_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v3
@@ -116,6 +119,9 @@ jobs:
           [ -n "${REMOTE_APP_DIR}" ] || { echo "REMOTE_APP_DIR is required (set secret or variable)."; exit 1; }
           [ -n "${DOMAIN_NAME}" ] || { echo "DOMAIN_NAME is required (set secret or variable)."; exit 1; }
           [ -n "${LETSENCRYPT_EMAIL}" ] || { echo "LETSENCRYPT_EMAIL is required (set secret or variable)."; exit 1; }
+          [ -n "${SECRET_KEY}" ] || { echo "SECRET_KEY is required (set secret or variable)."; exit 1; }
+          [ -n "${ADMIN_USERNAME}" ] || { echo "ADMIN_USERNAME is required (set secret or variable)."; exit 1; }
+          [ -n "${ADMIN_PASSWORD}" ] || { echo "ADMIN_PASSWORD is required (set secret or variable)."; exit 1; }
 
       - name: Issue TLS certificate (first deploy only)
         run: |
@@ -123,6 +129,9 @@ jobs:
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
             export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
+            export SECRET_KEY='${SECRET_KEY}' && \
+            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
+            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
             mkdir -p certbot/conf certbot/www && \
             if [ ! -f certbot/conf/live/app/fullchain.pem ]; then \
               docker compose -f docker-compose.prod.yml down || true; \
@@ -140,6 +149,9 @@ jobs:
             set -euo pipefail; \
             cd ${REMOTE_APP_DIR} && \
             export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} && \
+            export SECRET_KEY='${SECRET_KEY}' && \
+            export ADMIN_USERNAME='${ADMIN_USERNAME}' && \
+            export ADMIN_PASSWORD='${ADMIN_PASSWORD}' && \
             docker compose -f docker-compose.prod.yml pull && \
             docker compose -f docker-compose.prod.yml up -d --remove-orphans && \
             docker run --rm \
